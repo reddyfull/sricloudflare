@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div>
-      Hello Guys This is CloudFlare Pages.{" "}
+      This  is  Cloudflare Sample pages.{" "}
       <Link href="/about">
         About
       </Link>
