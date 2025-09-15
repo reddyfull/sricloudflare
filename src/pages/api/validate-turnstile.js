@@ -61,7 +61,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { token } = req.body;
+    // Parse form data
+    const formData = await req.formData();
+    const token = formData.get('cf-turnstile-response');
     
     if (!token) {
       return res.status(400).json({ 
@@ -73,17 +75,37 @@ export default async function handler(req, res) {
     // Get client IP address
     const remoteip = req.headers['x-forwarded-for'] || 
                     req.headers['x-real-ip'] || 
-                    req.connection.remoteAddress || 
-                    req.socket.remoteAddress ||
-                    (req.connection.socket ? req.connection.socket.remoteAddress : null);
+                    req.headers['cf-connecting-ip'] ||
+                    'unknown';
+
+    console.log('Validating Turnstile token:', token.substring(0, 20) + '...');
+    console.log('Remote IP:', remoteip);
 
     // Validate the Turnstile token
     const result = await validateWithRetry(token, remoteip);
 
+    console.log('Turnstile validation result:', result);
+
     if (result.success) {
+      // Extract form data for processing
+      const formFields = {
+        firstName: formData.get('firstName'),
+        lastName: formData.get('lastName'),
+        dateOfBirth: formData.get('dateOfBirth'),
+        address: formData.get('address')
+      };
+
+      console.log('Form data received:', formFields);
+
       return res.status(200).json({ 
         success: true, 
-        message: 'Turnstile validation successful' 
+        message: 'Turnstile validation successful',
+        formData: formFields,
+        turnstileData: {
+          challenge_ts: result.challenge_ts,
+          hostname: result.hostname,
+          action: result.action
+        }
       });
     } else {
       return res.status(400).json({ 

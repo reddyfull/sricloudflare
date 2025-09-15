@@ -15,6 +15,7 @@ export default function ApplicationForm() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [isTurnstileLoaded, setIsTurnstileLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileWidgetId, setTurnstileWidgetId] = useState(null);
 
   // Load Turnstile script
   useEffect(() => {
@@ -27,26 +28,18 @@ export default function ApplicationForm() {
     };
     document.head.appendChild(script);
 
-    // Set up global callback functions
-    window.onTurnstileSuccess = onTurnstileSuccess;
-    window.onTurnstileError = onTurnstileError;
-    window.onTurnstileExpired = onTurnstileExpired;
-
     return () => {
       // Cleanup script on component unmount
       const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
       if (existingScript) {
         document.head.removeChild(existingScript);
       }
-      // Cleanup global functions
-      delete window.onTurnstileSuccess;
-      delete window.onTurnstileError;
-      delete window.onTurnstileExpired;
     };
   }, []);
 
   // Turnstile callback functions
   const onTurnstileSuccess = (token) => {
+    console.log('Turnstile success:', token);
     setTurnstileToken(token);
     if (errors.turnstile) {
       setErrors(prev => ({
@@ -57,6 +50,7 @@ export default function ApplicationForm() {
   };
 
   const onTurnstileError = () => {
+    console.log('Turnstile error');
     setTurnstileToken('');
     setErrors(prev => ({
       ...prev,
@@ -65,12 +59,26 @@ export default function ApplicationForm() {
   };
 
   const onTurnstileExpired = () => {
+    console.log('Turnstile expired');
     setTurnstileToken('');
     setErrors(prev => ({
       ...prev,
       turnstile: 'Turnstile verification expired. Please verify again.'
     }));
   };
+
+  // Set up global callback functions when component mounts
+  useEffect(() => {
+    window.onTurnstileSuccess = onTurnstileSuccess;
+    window.onTurnstileError = onTurnstileError;
+    window.onTurnstileExpired = onTurnstileExpired;
+
+    return () => {
+      delete window.onTurnstileSuccess;
+      delete window.onTurnstileError;
+      delete window.onTurnstileExpired;
+    };
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -133,20 +141,25 @@ export default function ApplicationForm() {
     setIsSubmitting(true);
 
     try {
-      // Validate Turnstile token with server
+      // Create FormData with all form fields and Turnstile token
+      const formDataToSend = new FormData();
+      formDataToSend.append('firstName', formData.firstName);
+      formDataToSend.append('lastName', formData.lastName);
+      formDataToSend.append('dateOfBirth', formData.dateOfBirth);
+      formDataToSend.append('address', formData.address);
+      formDataToSend.append('cf-turnstile-response', turnstileToken);
+
+      // Send form data to API endpoint
       const response = await fetch('/api/validate-turnstile', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: turnstileToken }),
+        body: formDataToSend,
       });
 
       const result = await response.json();
 
       if (result.success) {
         // Here you would typically send the form data to a server
-        console.log('Form submitted:', formData);
+        console.log('Form submitted successfully:', formData);
         setIsSubmitted(true);
         
         // Reset form after successful submission
@@ -403,6 +416,7 @@ export default function ApplicationForm() {
                 data-error-callback="onTurnstileError"
                 data-expired-callback="onTurnstileExpired"
                 data-theme="light"
+                data-size="normal"
                 style={{ marginBottom: '8px' }}
               />
             )}
