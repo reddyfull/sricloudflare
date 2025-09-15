@@ -41,6 +41,16 @@ export default function Home() {
               }}>
                 Contact Us
               </Link>
+              <Link href="/application-form" style={{ 
+                color: 'white', 
+                textDecoration: 'none', 
+                padding: '8px 16px',
+                borderRadius: '20px',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                transition: 'all 0.3s ease'
+              }}>
+                Application Form
+              </Link>
             </div>
           </nav>
         </div>
@@ -91,6 +101,20 @@ export default function Home() {
           }}>
             Learn More
           </Link>
+          <Link href="/application-form" style={{ 
+            backgroundColor: '#4ecdc4', 
+            color: 'white', 
+            padding: '15px 30px', 
+            borderRadius: '30px', 
+            textDecoration: 'none',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 15px rgba(78, 205, 196, 0.3)',
+            transition: 'all 0.3s ease',
+            display: 'inline-block'
+          }}>
+            Apply Now
+          </Link>
           <Link href="/contact-us" style={{ 
             backgroundColor: 'transparent', 
             color: 'white', 
@@ -103,7 +127,7 @@ export default function Home() {
             transition: 'all 0.3s ease',
             display: 'inline-block'
           }}>
-            Get Started
+            Contact Us
           </Link>
         </div>
       </section>
@@ -308,6 +332,9 @@ export default function Home() {
             </Link>
             <Link href="/contact-us" style={{ color: 'white', textDecoration: 'none', opacity: 0.8 }}>
               Contact Us
+            </Link>
+            <Link href="/application-form" style={{ color: 'white', textDecoration: 'none', opacity: 0.8 }}>
+              Application Form
             </Link>
             <a href="https://cloudflare.com" style={{ color: 'white', textDecoration: 'none', opacity: 0.8 }}>
               Cloudflare
