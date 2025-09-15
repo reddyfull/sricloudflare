@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from "next/link";
+import Head from "next/head";
 
 export default function ApplicationForm() {
   const [formData, setFormData] = useState({
@@ -11,6 +12,65 @@ export default function ApplicationForm() {
 
   const [errors, setErrors] = useState({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [isTurnstileLoaded, setIsTurnstileLoaded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load Turnstile script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      setIsTurnstileLoaded(true);
+    };
+    document.head.appendChild(script);
+
+    // Set up global callback functions
+    window.onTurnstileSuccess = onTurnstileSuccess;
+    window.onTurnstileError = onTurnstileError;
+    window.onTurnstileExpired = onTurnstileExpired;
+
+    return () => {
+      // Cleanup script on component unmount
+      const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
+      // Cleanup global functions
+      delete window.onTurnstileSuccess;
+      delete window.onTurnstileError;
+      delete window.onTurnstileExpired;
+    };
+  }, []);
+
+  // Turnstile callback functions
+  const onTurnstileSuccess = (token) => {
+    setTurnstileToken(token);
+    if (errors.turnstile) {
+      setErrors(prev => ({
+        ...prev,
+        turnstile: ''
+      }));
+    }
+  };
+
+  const onTurnstileError = () => {
+    setTurnstileToken('');
+    setErrors(prev => ({
+      ...prev,
+      turnstile: 'Turnstile verification failed. Please try again.'
+    }));
+  };
+
+  const onTurnstileExpired = () => {
+    setTurnstileToken('');
+    setErrors(prev => ({
+      ...prev,
+      turnstile: 'Turnstile verification expired. Please verify again.'
+    }));
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -55,28 +115,69 @@ export default function ApplicationForm() {
       newErrors.address = 'Address is required';
     }
 
+    if (!turnstileToken) {
+      newErrors.turnstile = 'Please complete the security verification';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (validateForm()) {
-      // Here you would typically send the data to a server
-      console.log('Form submitted:', formData);
-      setIsSubmitted(true);
-      
-      // Reset form after successful submission
-      setTimeout(() => {
-        setFormData({
-          firstName: '',
-          lastName: '',
-          dateOfBirth: '',
-          address: ''
-        });
-        setIsSubmitted(false);
-      }, 3000);
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Validate Turnstile token with server
+      const response = await fetch('/api/validate-turnstile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: turnstileToken }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Here you would typically send the form data to a server
+        console.log('Form submitted:', formData);
+        setIsSubmitted(true);
+        
+        // Reset form after successful submission
+        setTimeout(() => {
+          setFormData({
+            firstName: '',
+            lastName: '',
+            dateOfBirth: '',
+            address: ''
+          });
+          setTurnstileToken('');
+          setIsSubmitted(false);
+          // Reset Turnstile widget
+          if (window.turnstile) {
+            window.turnstile.reset();
+          }
+        }, 3000);
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          turnstile: 'Security verification failed. Please try again.'
+        }));
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setErrors(prev => ({
+        ...prev,
+        turnstile: 'An error occurred. Please try again.'
+      }));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -138,11 +239,16 @@ export default function ApplicationForm() {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px'
-    }}>
+    <>
+      <Head>
+        <title>Application Form - Cloudflare Pages</title>
+        <meta name="description" content="Submit your application with our secure form" />
+      </Head>
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
       {/* Header */}
       <header style={{ 
         padding: '20px 0', 
@@ -284,20 +390,62 @@ export default function ApplicationForm() {
             )}
           </div>
 
+          {/* Turnstile Widget */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>
+              Security Verification *
+            </label>
+            {isTurnstileLoaded && (
+              <div 
+                className="cf-turnstile"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAB1VuffTYBmbYo0v"}
+                data-callback="onTurnstileSuccess"
+                data-error-callback="onTurnstileError"
+                data-expired-callback="onTurnstileExpired"
+                data-theme="light"
+                style={{ marginBottom: '8px' }}
+              />
+            )}
+            {!isTurnstileLoaded && (
+              <div style={{
+                padding: '20px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                backgroundColor: '#f8f9fa',
+                textAlign: 'center',
+                color: '#666'
+              }}>
+                Loading security verification...
+              </div>
+            )}
+            {errors.turnstile && (
+              <div style={errorStyle}>{errors.turnstile}</div>
+            )}
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
-            style={buttonStyle}
+            disabled={isSubmitting || !turnstileToken}
+            style={{
+              ...buttonStyle,
+              opacity: isSubmitting || !turnstileToken ? 0.6 : 1,
+              cursor: isSubmitting || !turnstileToken ? 'not-allowed' : 'pointer'
+            }}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = '#0056b3';
-              e.target.style.transform = 'translateY(-2px)';
+              if (!isSubmitting && turnstileToken) {
+                e.target.style.backgroundColor = '#0056b3';
+                e.target.style.transform = 'translateY(-2px)';
+              }
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = '#0070f3';
-              e.target.style.transform = 'translateY(0)';
+              if (!isSubmitting && turnstileToken) {
+                e.target.style.backgroundColor = '#0070f3';
+                e.target.style.transform = 'translateY(0)';
+              }
             }}
           >
-            Submit Application
+            {isSubmitting ? 'Submitting...' : 'Submit Application'}
           </button>
         </form>
 
@@ -322,7 +470,8 @@ export default function ApplicationForm() {
             We comply with all applicable privacy laws and regulations.
           </p>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
