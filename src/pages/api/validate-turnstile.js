@@ -1,10 +1,16 @@
-const crypto = require("crypto");
-
 // Cloudflare Turnstile configuration
 const SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "0x4AAAAAAB1VuRdeZdHSoXnVAdk1R0AoGHM";
 
+// Configure for Edge Runtime
+export const runtime = 'edge';
+
+// Generate UUID using Web Crypto API (Edge Runtime compatible)
+function generateUUID() {
+  return crypto.randomUUID();
+}
+
 async function validateWithRetry(token, remoteip, maxRetries = 3) {
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = generateUUID();
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
